@@ -38,6 +38,16 @@
     <label for="accepted_disasters">対応する災害</label><br>
     <textarea id="accepted_disasters" name="accepted_disasters" rows="3">{{ form_values.accepted_disasters if form_values else '' }}</textarea>
   </p>
+  <fieldset>
+    <legend>対応する災害種別</legend>
+    {% for hazard in ('洪水', '土砂災害', '津波') %}
+      <label>
+        <input type="checkbox" name="hazards" value="{{ hazard }}"
+          {% if form_values and hazard in form_values.hazards %}checked{% endif %}>
+        {{ hazard }}
+      </label><br>
+    {% endfor %}
+  </fieldset>
   <p>
     <label for="facilities">設備</label><br>
     <textarea id="facilities" name="facilities" rows="3">{{ form_values.facilities if form_values else '' }}</textarea>

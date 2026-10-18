@@ -88,9 +88,11 @@ SHELTER_AMENITIES = [
     {'value': 'accessible_toilet', 'label': '多目的トイレ', 'icon': '🚻'},
     {'value': 'power_supply', 'label': '電源あり', 'icon': '🔌'},
     {'value': 'medical_support', 'label': '医療支援', 'icon': '⚕️'},
-    {'value': 'baby_support', 'label': '乳幼児対応', 'icon': '🍼'}
+    {'value': 'baby_support', 'label': '乳幼児対応', 'icon': '🍼'},
+    {'value': 'parking', 'label': '駐車場あり', 'icon': '🚗'}
 ]
 SHELTER_AMENITY_VALUES = {amenity['value'] for amenity in SHELTER_AMENITIES}
+SHELTER_HAZARDS = ('洪水', '土砂災害', '津波')
 
 def load_json(path, default):
     """JSONファイルを読み込む（存在しない・壊れている場合は default を返す）"""
@@ -154,9 +156,80 @@ def format_report_time(iso_str):
         return iso_str
 
 
-def filter_shelters(district=None):
-    """district 指定があれば一致する避難所のみ、なければ全件を返す"""
-    return [s for s in shelters if not district or s.get('district') == district]
+def filter_shelters(
+    district=None,
+    q='',
+    disaster='',
+    pet=False,
+    wheelchair=False,
+    parking=False
+):
+    """既存の地区条件と避難所検索条件を共通のAND条件で適用する"""
+    normalized_query = q.strip().casefold()
+
+    def supports_hazard(shelter):
+        hazards = shelter.get('hazards', [])
+        if isinstance(hazards, str):
+            hazards = [hazards]
+        if isinstance(hazards, (list, tuple, set)) and disaster in hazards:
+            return True
+        accepted_disasters = shelter.get('accepted_disasters', '')
+        return isinstance(accepted_disasters, str) and disaster in accepted_disasters
+
+    def has_amenity(shelter, field, amenity):
+        amenities = shelter.get('amenities', [])
+        return shelter.get(field) is True or (
+            isinstance(amenities, (list, tuple, set)) and amenity in amenities
+        )
+
+    filtered = []
+    for shelter in shelters:
+        if district and shelter.get('district') != district:
+            continue
+        if normalized_query and not any(
+            normalized_query in value.casefold()
+            for value in (
+                shelter.get('name', ''),
+                shelter.get('district', ''),
+                shelter.get('address', '')
+            )
+            if isinstance(value, str)
+        ):
+            continue
+        if disaster and not supports_hazard(shelter):
+            continue
+        if pet and not has_amenity(shelter, 'pet_allowed', 'pet_allowed'):
+            continue
+        if wheelchair and not has_amenity(
+            shelter, 'wheelchair_accessible', 'barrier_free'
+        ):
+            continue
+        if parking and not has_amenity(shelter, 'parking', 'parking'):
+            continue
+        filtered.append(shelter)
+    return filtered
+
+
+def get_shelter_search_values(args):
+    disaster = args.get('disaster', '').strip()
+    return {
+        'q': args.get('q', '').strip(),
+        'district': args.get('district', '').strip(),
+        'disaster': disaster if disaster in SHELTER_HAZARDS else '',
+        'pet': args.get('pet') in ('1', 'true', 'on'),
+        'wheelchair': args.get('wheelchair') in ('1', 'true', 'on'),
+        'parking': args.get('parking') in ('1', 'true', 'on')
+    }
+
+
+def render_shelter_results(results, search_values, status_error=None):
+    return render_template(
+        'search_results.html',
+        results=results,
+        total_count=len(shelters),
+        status_error=status_error,
+        **search_values
+    )
 
 
 def parse_area_warnings(warning_data):
@@ -305,6 +378,10 @@ def shelter_register():
             'capacity': request.form.get('capacity', '').strip(),
             'current_evacuees': request.form.get('current_evacuees', '').strip(),
             'accepted_disasters': request.form.get('accepted_disasters', '').strip(),
+            'hazards': [
+                value for value in request.form.getlist('hazards')
+                if value in SHELTER_HAZARDS
+            ],
             'facilities': request.form.get('facilities', '').strip(),
             'amenities': [
                 value for value in request.form.getlist('amenities')
@@ -351,6 +428,10 @@ def shelter_register():
             'capacity': counts['capacity'],
             'current_evacuees': counts['current_evacuees'],
             'accepted_disasters': form_values['accepted_disasters'],
+            'hazards': form_values['hazards'],
+            'pet_allowed': 'pet_allowed' in form_values['amenities'],
+            'wheelchair_accessible': 'barrier_free' in form_values['amenities'],
+            'parking': 'parking' in form_values['amenities'],
             'facilities': form_values['facilities'],
             'amenities': form_values['amenities']
         }
@@ -366,12 +447,22 @@ def shelter_register():
 # 避難所検索ページ
 @app.route('/shelter_search')
 def shelter_search():
-    return render_template('shelter_search.html')
+    search_values = get_shelter_search_values(request.args)
+    results = filter_shelters(
+        district=search_values['district'],
+        q=search_values['q'],
+        disaster=search_values['disaster'],
+        pet=search_values['pet'],
+        wheelchair=search_values['wheelchair'],
+        parking=search_values['parking']
+    )
+    return render_shelter_results(results, search_values)
 
 # 全施設一覧ページ
 @app.route('/all_shelters')
 def all_shelters():
-    return render_template('search_results.html', results=shelters)
+    search_values = get_shelter_search_values({})
+    return render_shelter_results(shelters, search_values)
 
 
 @app.route('/shelter_status/<int:shelter_id>', methods=['POST'])
@@ -398,9 +489,18 @@ def update_shelter_status(shelter_id):
             if counts[field] < 0:
                 raise ValueError
         except ValueError:
-            return render_template(
-                'search_results.html',
-                results=filter_shelters(request.args.get('district')),
+            search_values = get_shelter_search_values(request.args)
+            results = filter_shelters(
+                district=search_values['district'],
+                q=search_values['q'],
+                disaster=search_values['disaster'],
+                pet=search_values['pet'],
+                wheelchair=search_values['wheelchair'],
+                parking=search_values['parking']
+            )
+            return render_shelter_results(
+                results,
+                search_values,
                 status_error=f'{label}は0以上の整数で入力してください。'
             )
 
@@ -408,9 +508,9 @@ def update_shelter_status(shelter_id):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(shelters, f, ensure_ascii=False, indent=2)
 
-    district = request.args.get('district')
-    if district:
-        return redirect(url_for('search_results', district=district))
+    query_params = request.args.to_dict()
+    if query_params:
+        return redirect(url_for('search_results', **query_params))
     return redirect(url_for('all_shelters'))
 
 
@@ -424,13 +524,29 @@ def board():
 # 検索結果ページ：templates/search_results.html を返す
 @app.route('/search_results')
 def search_results():
-    results = filter_shelters(request.args.get('district'))
-    return render_template('search_results.html', results=results)
+    search_values = get_shelter_search_values(request.args)
+    results = filter_shelters(
+        district=search_values['district'],
+        q=search_values['q'],
+        disaster=search_values['disaster'],
+        pet=search_values['pet'],
+        wheelchair=search_values['wheelchair'],
+        parking=search_values['parking']
+    )
+    return render_shelter_results(results, search_values)
 
 # JSON API：/shelters?district=地区名
 @app.route('/shelters', methods=['GET'])
 def get_shelters():
-    results = filter_shelters(request.args.get('district'))
+    search_values = get_shelter_search_values(request.args)
+    results = filter_shelters(
+        district=search_values['district'],
+        q=search_values['q'],
+        disaster=search_values['disaster'],
+        pet=search_values['pet'],
+        wheelchair=search_values['wheelchair'],
+        parking=search_values['parking']
+    )
 
     if not results:
         # 見つからなければエラー JSON を返す

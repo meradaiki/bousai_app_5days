@@ -1,13 +1,69 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>検索結果</h2>
+{% include "shelter_search.html" %}
 
 {% if status_error %}
   <p role="alert">{{ status_error }}</p>
 {% endif %}
 
 <style>
+  .search-panel {
+    max-width: 900px;
+    margin: 0 auto 28px;
+    padding: 20px;
+    border: 1px solid #dce4ef;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .search-panel h2 { margin-top: 0; }
+  .search-query { display: grid; gap: 8px; }
+  .search-query input, .search-filters select {
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 1px solid #9aa9bc;
+    border-radius: 4px;
+    font: inherit;
+  }
+
+  .search-filters {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) 2fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .search-filters > div { display: grid; align-content: start; gap: 8px; }
+  .search-filters fieldset { display: grid; gap: 8px; }
+  .search-filters fieldset label { min-height: 24px; }
+  .search-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; }
+  .search-actions button {
+    min-height: 42px;
+    padding: 8px 20px;
+    border: 0;
+    border-radius: 4px;
+    background: #2456ad;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .search-panel a { color: #2456ad; }
+  .search-panel :focus-visible, .shelter-results :focus-visible, .no-results a:focus-visible {
+    outline: 3px solid #f0a500;
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 600px) {
+    .search-filters { grid-template-columns: 1fr; }
+  }
+
+  .results-heading { margin-bottom: 6px; }
+  .results-count { margin-top: 0; color: #48586b; }
+  .shelter-location { display: block; margin-top: 4px; color: #48586b; font-size: 0.92em; font-weight: 400; }
+
   .shelter-results {
     width: 100%;
     border-collapse: collapse;
@@ -79,14 +135,16 @@
   .search-again:hover, .search-again:focus-visible { background: #193f82; }
 </style>
 
+<h2 class="results-heading">{% if q %}「{{ q }}」の検索結果{% elif district or disaster or pet or wheelchair or parking %}条件に合う避難所の検索結果{% else %}登録されている避難所{% endif %}</h2>
+<p class="results-count">{{ results|length }}件 / 全{{ total_count }}件</p>
+
 {% if results %}
   <div class="shelter-results-wrap">
     <table class="shelter-results">
       <thead>
         <tr>
+          <th scope="col">番号</th>
           <th scope="col">避難所名</th>
-          <th scope="col">地区</th>
-          <th scope="col">住所</th>
           <th scope="col">収容人数</th>
           <th scope="col">現在の避難者数</th>
           <th scope="col">空き状況</th>
@@ -98,9 +156,15 @@
       <tbody>
     {% for shelter in results %}
         <tr>
-          <th scope="row">{{ shelter.name }}</th>
-          <td>{{ shelter.district or '未登録' }}</td>
-          <td>{{ shelter.address or '未登録' }}</td>
+          <td>{{ loop.index }}</td>
+          <th scope="row">
+            {{ shelter.name }}
+            {% if shelter.get('district') or shelter.get('address') %}
+              <span class="shelter-location">
+                {% if shelter.get('district') %}{{ shelter.get('district') }}{% if shelter.get('address') %}・{% endif %}{% endif %}{{ shelter.get('address', '') }}
+              </span>
+            {% endif %}
+          </th>
           <td>{% if shelter.get('capacity') is not none and shelter.get('capacity') != '' %}{{ shelter.get('capacity') }}人{% else %}未登録{% endif %}</td>
           <td>{% if shelter.get('current_evacuees') is not none and shelter.get('current_evacuees') != '' %}{{ shelter.get('current_evacuees') }}人{% else %}未登録{% endif %}</td>
           <td>
@@ -134,7 +198,7 @@
           </td>
           {% if session.logged_in %}
             <td>
-              <form method="post" action="{{ url_for('update_shelter_status', shelter_id=shelter.id, district=request.args.get('district', '')) }}">
+              <form method="post" action="{{ url_for('update_shelter_status', shelter_id=shelter.id, **request.args.to_dict()) }}">
                 <label>
                   収容人数
                   <input type="number" name="capacity" min="0" value="{{ shelter.get('capacity') if shelter.get('capacity') is not none else '' }}" required>
@@ -154,8 +218,8 @@
   </div>
 {% else %}
   <section class="no-results" aria-labelledby="no-results-title">
-    <h3 id="no-results-title">条件に合う避難所がありません</h3>
-    <p>地区などの検索条件を変更して、もう一度お試しください。</p>
+    <h3 id="no-results-title">条件に一致する避難所が見つかりませんでした。</h3>
+    <p>検索条件を変更して、もう一度お試しください。</p>
     <a class="search-again" href="{{ url_for('shelter_search') }}">条件を変えて再検索</a>
   </section>
 {% endif %}

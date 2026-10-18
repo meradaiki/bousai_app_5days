@@ -1,21 +1,31 @@
-{% extends "base.html" %}
-
-{% block content %}
-<h2>避難所検索</h2>
-<p>登録されている避難所を確認できます。</p>
-
-<form method="get" action="{{ url_for('search_results') }}">
-  <p>
-    <label for="district">地区</label><br>
-    <input type="search" id="district" name="district" list="shelter-districts" placeholder="地区名を入力">
-    <datalist id="shelter-districts">
-      {% for district in districts %}
-        <option value="{{ district }}">
-      {% endfor %}
-    </datalist>
-  </p>
-  <p><button type="submit">この条件で検索</button></p>
-</form>
-
-<p><a href="/all_shelters">全施設一覧</a></p>
-{% endblock %}
+<section class="search-panel" aria-labelledby="search-heading">
+  <h2 id="search-heading">避難所検索</h2>
+  <form method="get" action="{{ url_for('shelter_search') }}">
+    <div class="search-query">
+      <label for="q">避難所名・地区名・住所で検索</label>
+      <input type="search" id="q" name="q" value="{{ q }}" placeholder="例：小学校、中央地区">
+    </div>
+    <div class="search-filters">
+      <div>
+        <label for="disaster">災害の種類</label>
+        <select id="disaster" name="disaster">
+          <option value="">指定なし</option>
+          {% for hazard in ('洪水', '土砂災害', '津波') %}
+            <option value="{{ hazard }}" {% if disaster == hazard %}selected{% endif %}>{{ hazard }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <fieldset>
+        <legend>対応条件</legend>
+        <label><input type="checkbox" name="pet" value="1" {% if pet %}checked{% endif %}> ペット同伴可</label>
+        <label><input type="checkbox" name="wheelchair" value="1" {% if wheelchair %}checked{% endif %}> 車椅子対応</label>
+        <label><input type="checkbox" name="parking" value="1" {% if parking %}checked{% endif %}> 駐車場あり</label>
+      </fieldset>
+    </div>
+    <div class="search-actions">
+      <button type="submit">検索</button>
+      <a href="{{ url_for('shelter_search') }}">条件をクリア</a>
+    </div>
+  </form>
+  <p><a href="{{ url_for('all_shelters') }}">全避難所一覧</a></p>
+</section>
