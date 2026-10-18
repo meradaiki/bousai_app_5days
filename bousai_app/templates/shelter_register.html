@@ -16,8 +16,43 @@
 <form method="POST">
   <p>
     <label for="name">避難所名（必須）</label><br>
-    <input type="text" id="name" name="name">
+    <input type="text" id="name" name="name" value="{{ form_values.name if form_values else '' }}" required>
   </p>
+  <p>
+    <label for="district">地区</label><br>
+    <input type="text" id="district" name="district" value="{{ form_values.district if form_values else '' }}">
+  </p>
+  <p>
+    <label for="address">住所</label><br>
+    <input type="text" id="address" name="address" value="{{ form_values.address if form_values else '' }}">
+  </p>
+  <p>
+    <label for="capacity">収容人数（人）</label><br>
+    <input type="number" id="capacity" name="capacity" min="0" value="{{ form_values.capacity if form_values else '' }}">
+  </p>
+  <p>
+    <label for="current_evacuees">現在の避難者数（人）</label><br>
+    <input type="number" id="current_evacuees" name="current_evacuees" min="0" value="{{ form_values.current_evacuees if form_values else '' }}">
+  </p>
+  <p>
+    <label for="accepted_disasters">対応する災害</label><br>
+    <textarea id="accepted_disasters" name="accepted_disasters" rows="3">{{ form_values.accepted_disasters if form_values else '' }}</textarea>
+  </p>
+  <p>
+    <label for="facilities">設備</label><br>
+    <textarea id="facilities" name="facilities" rows="3">{{ form_values.facilities if form_values else '' }}</textarea>
+  </p>
+  <fieldset>
+    <legend>設備・対応アイコン</legend>
+    {% for amenity in shelter_amenities %}
+      <label>
+        <input type="checkbox" name="amenities" value="{{ amenity.value }}"
+          {% if form_values and amenity.value in form_values.amenities %}checked{% endif %}>
+        <span aria-hidden="true">{{ amenity.icon }}</span>
+        {{ amenity.label }}
+      </label><br>
+    {% endfor %}
+  </fieldset>
   <p><button type="submit">登録</button></p>
 </form>
 {% endblock %}

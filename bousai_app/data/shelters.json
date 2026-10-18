@@ -1,7 +1,9 @@
 [
   {
     "id": 1,
-    "name": "御所見小学校"
+    "name": "御所見小学校",
+    "capacity": 100,
+    "current_evacuees": 20
   },
   {
     "id": 2,
@@ -10,5 +12,34 @@
   {
     "id": 5,
     "name": "鵠洋小学校"
+  },
+  {
+    "id": 6,
+    "name": "青森市役所"
+  },
+  {
+    "id": 7,
+    "name": "青森市役所"
+  },
+  {
+    "id": 8,
+    "name": "青森市役所"
+  },
+  {
+    "id": 9,
+    "name": "青森市役所"
+  },
+  {
+    "id": 10,
+    "name": "青森避難所",
+    "district": "",
+    "address": "",
+    "capacity": 200,
+    "current_evacuees": 180,
+    "accepted_disasters": "",
+    "facilities": "",
+    "amenities": [
+      "pet_allowed"
+    ]
   }
 ]

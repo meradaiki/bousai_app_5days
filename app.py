@@ -366,12 +366,7 @@ def shelter_register():
 # 避難所検索ページ
 @app.route('/shelter_search')
 def shelter_search():
-    districts = sorted({
-        shelter.get('district', '').strip()
-        for shelter in shelters
-        if shelter.get('district', '').strip()
-    })
-    return render_template('shelter_search.html', districts=districts)
+    return render_template('shelter_search.html')
 
 # 全施設一覧ページ
 @app.route('/all_shelters')
@@ -429,8 +424,7 @@ def board():
 # 検索結果ページ：templates/search_results.html を返す
 @app.route('/search_results')
 def search_results():
-    district = request.args.get('district', '').strip()
-    results = filter_shelters(district)
+    results = filter_shelters(request.args.get('district'))
     return render_template('search_results.html', results=results)
 
 # JSON API：/shelters?district=地区名

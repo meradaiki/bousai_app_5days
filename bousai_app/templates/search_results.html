@@ -3,14 +3,161 @@
 {% block content %}
 <h2>検索結果</h2>
 
+{% if status_error %}
+  <p role="alert">{{ status_error }}</p>
+{% endif %}
+
+<style>
+  .shelter-results {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+  }
+
+  .shelter-results th, .shelter-results td {
+    padding: 12px;
+    border: 1px solid #dce4ef;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .shelter-results th { background: #edf3fc; }
+
+  .shelter-results-wrap {
+    overflow-x: auto;
+  }
+
+  .availability {
+    display: inline-block;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .availability-open { background: #d9f2df; color: #176b2c; }
+  .availability-full { background: #fde0e0; color: #a52020; }
+  .availability-unknown { background: #e8edf3; color: #48586b; }
+
+  .amenity-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .amenity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border: 1px solid #dce4ef;
+    border-radius: 999px;
+    background: #f5f7fa;
+    white-space: nowrap;
+  }
+
+  .no-results {
+    padding: 20px;
+    border: 1px solid #dce4ef;
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  .search-again {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 4px;
+    background: #2456ad;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .search-again:hover, .search-again:focus-visible { background: #193f82; }
+</style>
+
 {% if results %}
-  <ul>
+  <div class="shelter-results-wrap">
+    <table class="shelter-results">
+      <thead>
+        <tr>
+          <th scope="col">避難所名</th>
+          <th scope="col">地区</th>
+          <th scope="col">住所</th>
+          <th scope="col">収容人数</th>
+          <th scope="col">現在の避難者数</th>
+          <th scope="col">空き状況</th>
+          <th scope="col">対応する災害</th>
+          <th scope="col">設備</th>
+          {% if session.logged_in %}<th scope="col">人数の更新</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
     {% for shelter in results %}
-    <li>{{ shelter.name }}</li>
+        <tr>
+          <th scope="row">{{ shelter.name }}</th>
+          <td>{{ shelter.district or '未登録' }}</td>
+          <td>{{ shelter.address or '未登録' }}</td>
+          <td>{% if shelter.get('capacity') is not none and shelter.get('capacity') != '' %}{{ shelter.get('capacity') }}人{% else %}未登録{% endif %}</td>
+          <td>{% if shelter.get('current_evacuees') is not none and shelter.get('current_evacuees') != '' %}{{ shelter.get('current_evacuees') }}人{% else %}未登録{% endif %}</td>
+          <td>
+            {% set capacity = shelter.get('capacity') %}
+            {% set current_evacuees = shelter.get('current_evacuees') %}
+            {% if capacity is not none and capacity != '' and current_evacuees is not none and current_evacuees != '' %}
+              {% if current_evacuees >= capacity %}
+                <span class="availability availability-full">{% if current_evacuees > capacity %}定員超過{% else %}満員{% endif %}</span>
+              {% else %}
+                <span class="availability availability-open">空きあり（残り{{ capacity - current_evacuees }}人）</span>
+              {% endif %}
+            {% else %}
+              <span class="availability availability-unknown">不明</span>
+            {% endif %}
+          </td>
+          <td>{{ shelter.accepted_disasters or '未登録' }}</td>
+          <td>
+            {% if shelter.get('amenities') %}
+              <ul class="amenity-list" aria-label="設備・対応">
+                {% for amenity in shelter_amenities %}
+                  {% if amenity.value in shelter.get('amenities', []) %}
+                    <li class="amenity-badge">
+                      <span aria-hidden="true">{{ amenity.icon }}</span>
+                      {{ amenity.label }}
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {% if shelter.facilities %}{{ shelter.facilities }}{% elif not shelter.get('amenities') %}未登録{% endif %}
+          </td>
+          {% if session.logged_in %}
+            <td>
+              <form method="post" action="{{ url_for('update_shelter_status', shelter_id=shelter.id, district=request.args.get('district', '')) }}">
+                <label>
+                  収容人数
+                  <input type="number" name="capacity" min="0" value="{{ shelter.get('capacity') if shelter.get('capacity') is not none else '' }}" required>
+                </label>
+                <label>
+                  現在の避難者数
+                  <input type="number" name="current_evacuees" min="0" value="{{ shelter.get('current_evacuees') if shelter.get('current_evacuees') is not none else '' }}" required>
+                </label>
+                <button type="submit">人数を更新</button>
+              </form>
+            </td>
+          {% endif %}
+        </tr>
     {% endfor %}
-  </ul>
+      </tbody>
+    </table>
+  </div>
 {% else %}
-  <p>該当する避難所が見つかりませんでした</p>
+  <section class="no-results" aria-labelledby="no-results-title">
+    <h3 id="no-results-title">条件に合う避難所がありません</h3>
+    <p>地区などの検索条件を変更して、もう一度お試しください。</p>
+    <a class="search-again" href="{{ url_for('shelter_search') }}">条件を変えて再検索</a>
+  </section>
 {% endif %}
 
 <p>

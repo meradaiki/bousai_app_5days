@@ -4,5 +4,18 @@
 <h2>避難所検索</h2>
 <p>登録されている避難所を確認できます。</p>
 
+<form method="get" action="{{ url_for('search_results') }}">
+  <p>
+    <label for="district">地区</label><br>
+    <input type="search" id="district" name="district" list="shelter-districts" placeholder="地区名を入力">
+    <datalist id="shelter-districts">
+      {% for district in districts %}
+        <option value="{{ district }}">
+      {% endfor %}
+    </datalist>
+  </p>
+  <p><button type="submit">この条件で検索</button></p>
+</form>
+
 <p><a href="/all_shelters">全施設一覧</a></p>
 {% endblock %}
